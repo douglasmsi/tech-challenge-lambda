@@ -1,20 +1,11 @@
 const AWS = require("aws-sdk");
 const cognitoIdentityProvider = new AWS.CognitoIdentityServiceProvider();
 
-async function onError(error) {
-  var myErrorObj = {
-    errorType: "InternalServerError",
-    httpStatus: 500,
-    body: error.message,
-  };
-  callback(JSON.stringify(myErrorObj));
-}
-
-async function onRegister(event, callback) {
-  const { name, email, password } = event;
+async function onRegister(event) {
+  const { name, email, password, cpf, phone_number, address } = event; // Adicione o atributo cpf
 
   const authenticationParams = {
-    ClientId: process.env.CLIENTID,
+     ClientId: process.env.CLIENTID,
     Username: email,
     Password: password,
     UserAttributes: [
@@ -26,35 +17,42 @@ async function onRegister(event, callback) {
         Name: "name",
         Value: name,
       },
+      {
+        Name: "phone_number",
+        Value: phone_number,
+      },
+      {
+        Name: "address",
+        Value: address,
+      },
+      {
+        Name: "custom:cpf", // Adicione o atributo CPF aqui
+        Value: cpf,
+      },
     ],
   };
-
-  try {
-    const authResponse = await cognitoIdentityProvider
-      .signUp(authenticationParams)
-      .promise();
-
-    return {
-      message: "User registered successfully.",
-      body: {
-        statusCode: 200,
-        email,
-        userId: authResponse?.UserSub,
-      },
-    };
-  } catch (error) {
-    return onError(error);
-  }
+  const authResponse = await cognitoIdentityProvider
+    .signUp(authenticationParams)
+    .promise();
+    
+  return {
+    message: "User registered successfully.",
+    body: {
+      statusCode: 200,
+      cpf,
+      userId: authResponse?.UserSub,
+    },
+  };
 }
 
 async function onLogin(event) {
-  const { email, password } = event;
+  const { cpf, password } = event; // Modifique para pegar CPF e senha
 
   const loginParams = {
-    AuthFlow: "USER_PASSWORD_AUTH",
+    AuthFlow: "CUSTOM_AUTH", // Use o fluxo de autenticação personalizado
     ClientId: process?.env?.CLIENTID,
     AuthParameters: {
-      USERNAME: email,
+      USERNAME: cpf, // Modifique para usar o CPF como USERNAME
       PASSWORD: password,
     },
   };
@@ -69,18 +67,19 @@ async function onLogin(event) {
       message: "User authenticated successfully.",
       body: {
         token: loginResult?.AuthenticationResult?.AccessToken,
-        email: email,
+        cpf: cpf, // Inclua o CPF na resposta
         refreshToken: loginResult?.AuthenticationResult?.RefreshToken,
       },
     };
   } catch (error) {
-    onError(error);
+    console.log(error);
   }
 }
 
-exports.handler = async (event, _, callback) => {
+
+exports.handler = async (event) => {
   if (event.auth === "register") {
-    const response = await onRegister(event, callback).then((result) => result);
+    const response = await onRegister(event).then((result) => result);
     return response;
   } else if (event.auth === "login") {
     const response = await onLogin(event).then((result) => result);
