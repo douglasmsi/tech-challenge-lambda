@@ -20,3 +20,4 @@ jobs:
           aws_region: us-east-1
           function_name: gorush
           source: handler.js
+          environment: CLIENTID=${{ secrets.CLIENT_ID_COGNITO }}
